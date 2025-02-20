@@ -12,27 +12,21 @@ const UploadForm = () => {
   const handleUpload = async () => {
     if (!file) return;
 
-    const fileName = encodeURIComponent(file.name);
-    const fileType = file.type;
-
     try {
-      // Get the signed URL from the API
       const res = await fetch("/api/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName, fileType }),
-      });
-
-      const { uploadURL } = await res.json();
-
-      // Upload the file to S3 using the signed URL
-      await fetch(uploadURL, {
-        method: "PUT",
-        headers: { "Content-Type": fileType },
+        headers: {
+          "Content-Type": file.type,
+          "x-file-name": file.name,
+        },
         body: file,
       });
 
-      alert("File uploaded successfully!");
+      if (res.ok) {
+        alert("File uploaded successfully!");
+      } else {
+        alert("Failed to upload file.");
+      }
     } catch (error) {
       console.error("Upload failed:", error);
       alert("Failed to upload file.");
