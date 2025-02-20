@@ -17,6 +17,41 @@ export const config = {
   },
 };
 
+const bufferRequestBody = async (req: NextApiRequest): Promise<Buffer> => {
+  const chunks: Buffer[] = [];
+  return new Promise((resolve, reject) => {
+    req.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    req.on('end', () => {
+      resolve(Buffer.concat(chunks));
+    });
+    req.on('error', (err) => {
+      reject(err);
+    });
+  });
+};
+
+export async function uploadBlob(req: NextApiRequest, key: string): Promise<string> {
+  const body = await bufferRequestBody(req);
+  const params = {
+    Bucket: process.env.AWS_S3_BUCKET,
+    Key: key,
+    Body: body,
+    ContentType: req.headers['content-type'] as string,
+    ContentLength: body.length,
+  };
+
+  try {
+    const command = new PutObjectCommand(params);
+    await s3Client.send(command);
+    return key;
+  } catch (err) {
+    console.log("Error uploading blob to S3:", err);
+    throw err;
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     const bucketName = process.env.AWS_S3_BUCKET;
@@ -48,15 +83,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const bucketName = process.env.AWS_S3_BUCKET;
     const key = req.headers['x-file-name'] as string;
     const contentType = req.headers['content-type'] as string;
-    const contentLength = req.headers['content-length'] as string;
 
     try {
+      const body = await bufferRequestBody(req);
       const params = {
         Bucket: bucketName,
         Key: key,
-        Body: req,
+        Body: body,
         ContentType: contentType,
-        ContentLength: parseInt(contentLength, 10),
+        ContentLength: body.length,
       };
 
       const command = new PutObjectCommand(params);
